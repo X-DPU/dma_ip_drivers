@@ -1,8 +1,9 @@
 /*
  * This file is part of the Xilinx DMA IP Core driver for Linux
  *
- * Copyright (c) 2016-present,  Xilinx, Inc.
+ * Copyright (c) 2016-2022,  Xilinx, Inc.
  * All rights reserved.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc. All rights reserved.
  *
  * This source code is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -242,14 +243,14 @@
 #define dbg_desc	pr_err
 #else
 /* disable debugging */
-#define dbg_io(...)
-#define dbg_fops(...)
-#define dbg_perf(...)
-#define dbg_sg(...)
-#define dbg_tfr(...)
-#define dbg_irq(...)
-#define dbg_init(...)
-#define dbg_desc(...)
+#define dbg_io(...)	do {} while(0)
+#define dbg_fops(...)	do {} while(0)
+#define dbg_perf(...)	do {} while(0)
+#define dbg_sg(...)	do {} while(0)
+#define dbg_tfr(...)	do {} while(0)
+#define dbg_irq(...)	do {} while(0)
+#define dbg_init(...)	do {} while(0)
+#define dbg_desc(...)	do {} while(0)
 #endif
 
 /* SECTION: Enum definitions */
@@ -483,7 +484,11 @@ struct xdma_request_cb {
 
 	unsigned int sw_desc_idx;
 	unsigned int sw_desc_cnt;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+        struct sw_desc sdesc[];
+#else
 	struct sw_desc sdesc[0];
+#endif
 };
 
 struct xdma_engine {

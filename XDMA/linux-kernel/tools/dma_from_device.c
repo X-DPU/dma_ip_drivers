@@ -1,8 +1,9 @@
 /*
  * This file is part of the Xilinx DMA IP Core driver tool for Linux
  *
- * Copyright (c) 2016-present,  Xilinx, Inc.
+ * Copyright (c) 2016-2022,  Xilinx, Inc.
  * All rights reserved.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc. All rights reserved.
  *
  * This source code is licensed under BSD-style license (found in the
  * LICENSE file in the root directory of this source tree)
@@ -240,7 +241,7 @@ static int test_dma(char *devname, uint64_t addr, uint64_t aperture,
 			rc = ioctl(fpga_fd, IOCTL_XDMA_APERTURE_R, &io);
 			if (rc < 0 || io.error) {
 				fprintf(stderr,
-					"#%d: aperture R failed %d,%d.\n",
+					"#%ld: aperture R failed %ld,%d.\n",
 					i, rc, io.error);
 				goto out;
 			}
@@ -256,14 +257,15 @@ static int test_dma(char *devname, uint64_t addr, uint64_t aperture,
 		clock_gettime(CLOCK_MONOTONIC, &ts_end);
 
 		if (bytes_done < size) {
-			fprintf(stderr, "#%d: underflow %ld/%ld.\n",
+			fprintf(stderr, "#%ld: underflow %ld/%ld.\n",
 				i, bytes_done, size);
 			underflow = 1;
 		}
 
 		/* subtract the start time from the end time */
 		timespec_sub(&ts_end, &ts_start);
-		total_time += ts_end.tv_nsec;
+		const long NS_PER_SEC = 1000000000;
+		total_time += ts_end.tv_sec * NS_PER_SEC + ts_end.tv_nsec;
 		/* a bit less accurate but side-effects are accounted for */
 		if (verbose)
 		fprintf(stdout,
