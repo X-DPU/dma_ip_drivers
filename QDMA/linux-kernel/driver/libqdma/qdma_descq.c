@@ -554,8 +554,18 @@ static ssize_t descq_proc_st_h2c_request(struct qdma_descq *descq)
 		unsigned int desc_max = descq->avail;
 		unsigned int data_cnt = 0;
 		unsigned int desc_cnt = 0;
+		/* ST H2C reuses ep_addr (meaningless for streaming) as the max
+		 * bytes-per-descriptor hint. In this exdes each descriptor is
+		 * emitted as ONE wire packet (SOP/EOP are only driven in bypass
+		 * mode), so the historical PAGE_SIZE cap silently CHOPPED any
+		 * packet over 4096 B into several broken wire frames -- that was
+		 * the "ARM link jumbo dies over MTU 4082" wall. A netdev sending
+		 * one linear skb per request passes ep_addr = skb->len so the
+		 * whole packet rides in a single descriptor; len/pld_len are
+		 * 16-bit so allow up to 16 KB per descriptor. Callers that pass
+		 * ep_addr = 0 keep the old PAGE_SIZE behaviour. */
 		unsigned int pktsz = req->ep_addr ?
-				min_t(unsigned int, req->ep_addr, PAGE_SIZE) :
+				min_t(unsigned int, req->ep_addr, SZ_16K) :
 				PAGE_SIZE;
 		int i = 0;
 		int rv;
