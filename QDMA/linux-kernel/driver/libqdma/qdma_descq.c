@@ -706,13 +706,22 @@ update_pidx:
 		}
 
 
-		ret = queue_pidx_update(descq->xdev, descq->conf.qidx,
-				descq->conf.q_type, &descq->pidx_info);
-		if (ret < 0) {
-			pr_err("%s: Failed to update pidx\n",
-					descq->conf.name);
-			unlock_descq(descq);
-			return -EINVAL;
+		/* Deferred-doorbell batching: the descriptors are already in the ring
+		 * and descq->pidx/pidx_info advanced. When defer_doorbell is set (an
+		 * xmit_more burst is in flight) skip the MMIO pidx write -- a later
+		 * submit with defer_doorbell clear rings it once for the whole burst,
+		 * cutting one PCIe doorbell per packet down to one per burst. The
+		 * netdev contract guarantees the burst's last packet clears xmit_more,
+		 * so a deferred doorbell is always flushed. */
+		if (!descq->defer_doorbell) {
+			ret = queue_pidx_update(descq->xdev, descq->conf.qidx,
+					descq->conf.q_type, &descq->pidx_info);
+			if (ret < 0) {
+				pr_err("%s: Failed to update pidx\n",
+						descq->conf.name);
+				unlock_descq(descq);
+				return -EINVAL;
+			}
 		}
 		descq_poll_mm_n_h2c_cmpl_status(descq);
 	}
@@ -1946,6 +1955,11 @@ int qdma_queue_packet_write(unsigned long dev_hndl, unsigned long id,
 		unlock_descq(descq);
 	}
 
+	/* Carry the caller's doorbell-defer hint (netdev_xmit_more()) into the descq
+	 * so the ST H2C proc below batches the pidx doorbell across the burst. The
+	 * netdev txq is single-writer (HARD_TX_LOCK), so this plain store is safe. */
+	descq->defer_doorbell = req->no_doorbell ? 1 : 0;
+
 	qdma_descq_proc_sgt_request(descq);
 
 
@@ -1959,6 +1973,35 @@ unmap_sgl:
 		sgl_unmap(descq->xdev->conf.pdev, req->sgl, req->sgcnt,
 			DMA_TO_DEVICE);
 	return rv;
+}
+
+/* Ring the ST H2C pidx doorbell for whatever descriptors are already in the ring.
+ * Used to FLUSH a deferred-doorbell burst (see req->no_doorbell) when the caller
+ * cannot guarantee a follow-up submit will do it -- e.g. the ring filled or the
+ * burst's terminal packet was dropped. Ringing an unchanged pidx is harmless, so
+ * this is safe to call unconditionally. Returns 0 on success. */
+int qdma_queue_h2c_kick(unsigned long dev_hndl, unsigned long id)
+{
+	struct xlnx_dma_dev *xdev = (struct xlnx_dma_dev *)dev_hndl;
+	struct qdma_descq *descq;
+	int ret = 0;
+
+	if (unlikely(!xdev || xdev_check_hndl(__func__, xdev->conf.pdev,
+					dev_hndl) < 0))
+		return -EINVAL;
+	descq = qdma_device_get_descq_by_id(xdev, id, NULL, 0, 0);
+	if (unlikely(!descq) || !descq->conf.st || descq->conf.q_type == Q_C2H)
+		return -EINVAL;
+
+	lock_descq(descq);
+	descq->defer_doorbell = 0;
+	if (descq->q_state == Q_STATE_ONLINE) {
+		descq->pidx_info.pidx = descq->pidx;
+		ret = queue_pidx_update(descq->xdev, descq->conf.qidx,
+				descq->conf.q_type, &descq->pidx_info);
+	}
+	unlock_descq(descq);
+	return ret;
 }
 
 int qdma_descq_get_cmpt_udd(unsigned long dev_hndl, unsigned long id,

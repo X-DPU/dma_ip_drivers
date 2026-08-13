@@ -810,7 +810,10 @@ struct qdma_request {
 	u8 h2c_eot:1;
 	/** state check disbaled in queue pkt API */
 	u8 check_qstate_disabled:1;
-	u8 _pad:3;
+	/** ST H2C: defer the pidx doorbell (batch with the next submit). Set from
+	 *  netdev_xmit_more() so a burst of packets rings ONE doorbell on the last. */
+	u8 no_doorbell:1;
+	u8 _pad:2;
 	/** user defined data present */
 	u8 udd_len;
 	/**  number of scatter-gather entries < 64K */
@@ -1554,6 +1557,18 @@ int qdma_queue_packet_read(unsigned long dev_hndl, unsigned long id,
  *****************************************************************************/
 int qdma_queue_packet_write(unsigned long dev_hndl, unsigned long id,
 			struct qdma_request *req);
+
+/*****************************************************************************/
+/**
+ * Flush a deferred ST H2C pidx doorbell (see qdma_request.no_doorbell). Rings
+ * the doorbell for descriptors already in the ring; safe to call unconditionally.
+ *
+ * @param dev_hndl	hndl returned from qdma_device_open()
+ * @param id		queue hndl returned from qdma_queue_add()
+ *
+ * @returns		0 on success, <0 on error
+ *****************************************************************************/
+int qdma_queue_h2c_kick(unsigned long dev_hndl, unsigned long id);
 
 /*****************************************************************************/
 /**

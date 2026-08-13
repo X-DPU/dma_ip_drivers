@@ -70,6 +70,10 @@ struct qdma_descq {
 	u8 color:1;
 	/** cpu attached */
 	u8 cpu_assigned:1;
+	/** ST H2C: if set, descq_proc_st_h2c_request writes descriptors but skips the
+	 *  pidx doorbell (deferred to the next submit). Set per-submit from
+	 *  req->no_doorbell so an xmit_more burst rings ONE doorbell on its last packet. */
+	u8 defer_doorbell:1;
 	/** state of the proc req */
 	u8 proc_req_running;
 	/* rx_time in CPU timestamp of ping_pong pkt for
