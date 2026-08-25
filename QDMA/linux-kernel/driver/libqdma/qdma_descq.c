@@ -636,13 +636,18 @@ static ssize_t descq_proc_st_h2c_request(struct qdma_descq *descq)
 					(u8 *)(page_address(sg->pg) +
 							sg->offset);
 
-				/* Setting SOP/EOP for the dummy bypass case */
+				/* Setting SOP/EOP for the dummy bypass case.
+				 * CPM4 hard IP executes H2C ST descriptor-bypass
+				 * returns ONLY as self-contained packets: every
+				 * bypass descriptor must carry BOTH SOP and EOP.
+				 * Grouped sop..eop framing is silently rejected
+				 * (h2c_count freezes). pld_len stays per-descriptor
+				 * (each descriptor IS a packet). Ref: vck5000_mini
+				 * qdma-h2c-bypass-sop-total-pldlen.patch.
+				 */
 				if (descq->conf.desc_bypass) {
-					if (i == 0)
-						desc->flags |= S_H2C_DESC_F_SOP;
-
-					if ((i == sg_max - 1))
-						desc->flags |= S_H2C_DESC_F_EOP;
+					desc->flags |= S_H2C_DESC_F_SOP;
+					desc->flags |= S_H2C_DESC_F_EOP;
 				}
 
 #if 0

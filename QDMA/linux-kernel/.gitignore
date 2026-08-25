@@ -12,3 +12,6 @@ apps/dma-xfer/dma-xfer
 bin/
 driver/src/Module.symvers
 driver/src/modules.order
+
+# build-time symlink created by make (points at driver/libqdma)
+driver/src/libqdma
