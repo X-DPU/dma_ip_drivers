@@ -42,6 +42,9 @@
 
 #include "qdma_mod.h"
 #include "libqdma/xdev.h"
+#ifdef QDMA_GPU_P2P
+#include "qdma_gpu_p2p.h"
+#endif
 
 /*
  * @struct - xlnx_phy_dev
@@ -224,6 +227,10 @@ static long cdev_gen_ioctl(struct file *file, unsigned int cmd,
 	case QDMA_CDEV_IOCTL_NO_MEMCPY:
 		get_user(xcdev->no_memcpy, (unsigned char *)arg);
 		return 0;
+#ifdef QDMA_GPU_P2P
+	case QDMA_GPU_P2P_XFER:
+		return qdma_gpu_p2p_ioctl(xcdev, cmd, arg);
+#endif
 	default:
 		break;
 	}

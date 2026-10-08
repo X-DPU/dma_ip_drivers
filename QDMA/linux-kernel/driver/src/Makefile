@@ -101,6 +101,22 @@ endif
 
 DRV_OBJS := nl.o cdev.o qdma_mod.o
 
+# Optional GPUDirect-RDMA P2P support (build with GPU_P2P=1).
+# Needs the NVIDIA driver sources for nv-p2p.h (NVIDIA_INC) and the DKMS-built
+# Module.symvers that exports the nvidia_p2p_* symbols (NVIDIA_SYMS). Both are
+# auto-detected for the running kernel; override either if the layout differs.
+# The qdma build feeds the kernel sub-make KBUILD_EXTRA_SYMBOLS=$(extra_symb),
+# so the NVIDIA symvers must go through extra_symb (not KBUILD_EXTRA_SYMBOLS).
+# Leaving GPU_P2P unset builds the stock driver unchanged (gpu2-compatible).
+ifeq ($(GPU_P2P),1)
+  GP2P_KVER   ?= $(shell uname -r)
+  NVIDIA_INC  ?= $(firstword $(wildcard /usr/src/nvidia-*/nvidia))
+  NVIDIA_SYMS ?= $(firstword $(wildcard /var/lib/dkms/nvidia/*/$(GP2P_KVER)/x86_64/module/Module.symvers))
+  EXTRA_CFLAGS += -DQDMA_GPU_P2P -I$(NVIDIA_INC)
+  DRV_OBJS += qdma_gpu_p2p.o
+  extra_symb := $(NVIDIA_SYMS)
+endif
+
 LIBQDMA_OBJS := libqdma/qdma_mbox.o libqdma/qdma_intr.o libqdma/qdma_st_c2h.o \
 	libqdma/qdma_thread.o libqdma/libqdma_export.o libqdma/qdma_context.o \
 	libqdma/qdma_sriov.o libqdma/qdma_platform.o libqdma/qdma_descq.o libqdma/qdma_regs.o \
